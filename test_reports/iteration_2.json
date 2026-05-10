@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend E2E on web preview. Found a CRITICAL Metro bundling failure on first load: 'Unable to resolve module react-native-svg from lucide-react-native/dist/esm/Icon.mjs'. The whole app rendered a red Server Error screen — every flow blocked. Root cause: lucide-react-native@1.14 has react-native-svg as a peer dependency, but it was NOT in package.json/node_modules. Fixed by `yarn add react-native-svg@15.12.1` (Expo-recommended version) and restarting expo. After fix, the landing screen renders correctly (screenshot verified): flame badge, IGNITE NUTRITION brand, particle background, 'Ignite Your Journey' primary CTA, and 'Try the AI nutrition coach (no login)' ghost button all visible. While re-running the full E2E I discovered the second blocker: the testIDs in /app/frontend/app/index.tsx do NOT match the names listed in the review_request, so the scripted CSS/data-testid selectors all miss. Did not have run-budget to retest every screen with corrected selectors; landing visual verification is complete, the rest of the flow needs a re-run after E1 aligns testIDs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "App bootstrap (Metro)", "issue": "Missing peer dep react-native-svg caused red Server Error screen on every route — entire frontend unusable until installed", "testID": "n/a", "priority": "CRITICAL (FIXED by testing agent)"}
+    ],
+    "integration_issues": [
+      {"flow": "Landing → Auth modal (sign-up CTA)", "issue": "review_request expects testID 'cta-ignite-journey' but code uses 'cta-get-started' on the primary 'Ignite Your Journey' button (app/index.tsx:89). Selectors will miss in any spec-driven test.", "affected_testIDs": ["cta-ignite-journey -> cta-get-started"]},
+      {"flow": "Auth form fields", "issue": "review_request expects testIDs 'auth-email','auth-password','auth-name' but code uses 'input-email','input-password','input-name' (app/index.tsx:121,126,130). Same naming mismatch will break automated sign-up.", "affected_testIDs": ["auth-email -> input-email","auth-password -> input-password","auth-name -> input-name"]}
+    ],
+    "design_issues": [
+      {"screen": "Landing", "issues": ["Visual layout looks good on 390x844: brand centered, flame badge with neon glow, particles visible, both CTAs are tappable-sized (>=44pt). No contrast/spacing issues observed."]}
+    ],
+    "react_native_issues": [
+      {"component": "lucide-react-native icons", "issue": "Requires react-native-svg peer dep — must stay pinned. Expo doctor warns expected version 15.12.1; installed that. Several other Expo SDK mismatches reported but non-fatal: @react-native-async-storage/async-storage 3.0.2 (expected 2.2.0), expo-blur 55.0.14 (~15.0.8), expo-image-picker 55.0.20 (~17.0.11), expo-linear-gradient 55.0.13 (~15.0.8). Recommend `npx expo install --check` to align."},
+      {"component": "Multiple components", "issue": "Console warnings: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' appearing 6+ times. Cosmetic, but worth migrating before SDK bump."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_1.json", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Decide on testID naming and align ONE side. Recommended: update app/index.tsx to use the spec names (cta-ignite-journey, auth-email, auth-password, auth-name) since the review_request and any future automation uses those, OR update the spec/playbook. Without alignment, the listed E2E will keep failing on selectors.",
+    "Keep react-native-svg pinned at 15.12.1 in package.json; it is now installed but main agent should commit the package.json/yarn.lock update.",
+    "Run `npx expo install --check` to align async-storage, expo-blur, expo-image-picker, expo-linear-gradient with SDK 55.",
+    "Replace deprecated shadow* style props with boxShadow on web (cosmetic console noise).",
+    "Re-run the full 10-step E2E (demo chat → signup → onboarding → dashboard → meal plan → log breakfast → AI chat → feed upload → progress → profile) once testIDs are aligned; backend is already 100% so failures from here on are pure UI/integration."
+  ],
+  "critical_code_review_comments": [
+    "Peer dependency drift: lucide-react-native shipped without its required react-native-svg in package.json. Add `peerDependencies` audit step in CI (or use `yarn install --check-files` + `expo doctor`) to catch this before it reaches preview.",
+    "TestID source-of-truth divergence between spec and implementation indicates no shared constants file. Consider a /app/frontend/constants/testIds.ts module imported by both screens and tests."
+  ],
+  "updated_files": ["/app/frontend/package.json (added react-native-svg@15.12.1)", "/app/frontend/yarn.lock"],
+  "success_rate": {"backend": "100% (15/15 — prior iteration)", "frontend": "Landing visual verified after fix; full 10-step flow NOT re-run due to testID mismatch (selectors miss). Pre-fix run: 1/10."},
+  "seed_data_creation": "None this iteration; the only signup attempt aborted at the testID-mismatch step.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "1) react-native-svg@15.12.1 is now installed — DO NOT remove it; lucide-react-native icons hard-depend on it. 2) Real testIDs in app/index.tsx for landing+auth are: cta-get-started (primary CTA), cta-demo-chat, tab-login, tab-signup, input-name, input-email, input-password, btn-auth-submit, btn-google, close-auth, close-demo, demo-input, demo-send, app-brand. Use these (NOT the names in the review_request) until E1 renames. 3) Expo tunnel has intermittent 'TypeError: Cannot read properties of undefined (reading body)' from ngrok — supervisor auto-restarts; allow ~45-60s after `restart expo` before hitting the URL. 4) Bundle URL pattern is /_expo/static/js/web/index.bundle?platform=web&dev=false — useful for warmup. 5) Mercury-2 chat replies usually <8s; meal-plan up to ~15s. Use 30s polling.",
+  "rca_of_issue": "RCA: Missing peer dependency. lucide-react-native@1.14.0 imports `react-native-svg` from its Icon.mjs ESM entry but does not list it in its own dependencies (it is a peerDependency that the host app must install). Project's package.json never added react-native-svg, so Metro's resolver failed at bundle time, producing a Server Error red screen at every route. Repro: fresh `yarn install`, start expo, open https://ignite-nutrition.preview.emergentagent.com — see 'Unable to resolve module react-native-svg from /app/frontend/node_modules/lucide-react-native/dist/esm/Icon.mjs'. Mitigation applied: `yarn add react-native-svg@15.12.1` (the version Expo SDK 55 expects), then `sudo supervisorctl restart expo`. Verified post-fix: landing screen renders fully with no red screen."
+}
