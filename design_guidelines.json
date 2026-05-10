@@ -1,0 +1,162 @@
+{
+  "theme": "dark",
+  "archetype": "7_electric_and_neon",
+  "brand_name": "Ignite Nutrition",
+  "typography": {
+    "heading_font": "Unbounded",
+    "body_font": "Outfit",
+    "react_native_scale": {
+      "h1": {
+        "fontSize": 48,
+        "lineHeight": 52,
+        "letterSpacing": -1.5,
+        "fontFamily": "Unbounded_900Black"
+      },
+      "h2": {
+        "fontSize": 32,
+        "lineHeight": 36,
+        "letterSpacing": -1,
+        "fontFamily": "Unbounded_700Bold"
+      },
+      "h3": {
+        "fontSize": 24,
+        "lineHeight": 28,
+        "letterSpacing": -0.5,
+        "fontFamily": "Unbounded_600SemiBold"
+      },
+      "h4": {
+        "fontSize": 18,
+        "lineHeight": 24,
+        "letterSpacing": -0.2,
+        "fontFamily": "Unbounded_600SemiBold"
+      },
+      "body": {
+        "fontSize": 16,
+        "lineHeight": 24,
+        "fontFamily": "Outfit_400Regular"
+      },
+      "body_sm": {
+        "fontSize": 14,
+        "lineHeight": 20,
+        "fontFamily": "Outfit_400Regular"
+      },
+      "label": {
+        "fontSize": 12,
+        "lineHeight": 16,
+        "letterSpacing": 1.2,
+        "fontFamily": "Outfit_600SemiBold",
+        "textTransform": "uppercase"
+      }
+    }
+  },
+  "color_palette": {
+    "background": {
+      "base": "#000000",
+      "surface": "#0A0A0A",
+      "surface_elevated": "#12121A"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A"
+    },
+    "accent": {
+      "primary": "#FF3B30",
+      "secondary": "#00FFFF",
+      "tertiary": "#B026FF",
+      "glow": "rgba(255, 59, 48, 0.4)"
+    },
+    "status": {
+      "good": "#00FF41",
+      "limit": "#FF9F0A",
+      "avoid": "#FF3B30"
+    },
+    "border": {
+      "subtle": "rgba(255, 255, 255, 0.08)",
+      "highlight": "rgba(255, 255, 255, 0.2)"
+    },
+    "surfaces": {
+      "glass": "rgba(10, 10, 10, 0.65)",
+      "glass_border": "rgba(255, 255, 255, 0.12)"
+    }
+  },
+  "layout_and_spacing": {
+    "container_padding": 24,
+    "card_padding": 20,
+    "border_radius": {
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "full": 9999
+    },
+    "gap": {
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32
+    }
+  },
+  "surface_strategies": {
+    "cards": "Glassmorphism using expo-blur <BlurView intensity={30} tint='dark' />. Must include 1px inner border using border_subtle color to define edges. Use subtle expo-linear-gradient behind key metrics.",
+    "buttons": "Primary CTA uses Accent Primary (#FF3B30) background with high-contrast text. Must include drop shadow matching the background color to create a neon glow: shadowColor: '#FF3B30', shadowRadius: 16, shadowOpacity: 0.6.",
+    "bottom_nav": "Floating bento-style tab bar. Absolute positioning at bottom. BlurView background. Active icon receives neon glow and color change (e.g., #00FFFF).",
+    "dashboard_widgets": "Bento box grid layout. Mix of 1x1, 1x2, and 2x2 widgets. Generous gap (16px). Use negative space effectively."
+  },
+  "animations_and_motion": {
+    "general": "Utilize react-native-reanimated for fluid, physics-based motion.",
+    "page_transitions": "Fade in + translateY (20px to 0px) using spring physics.",
+    "interactions": "Scale components down to 0.95 on onPressIn. Release back to 1 on onPressOut.",
+    "background_effects": "Floating AI particles on Landing Screen. Pulsing opacity on AI Chat button."
+  },
+  "screens": {
+    "landing": "Full-screen background image overlaid with linear-gradient fading to black at bottom. Floating glowing AI demo element. Glassmorphic login sheet.",
+    "onboarding": "Step-by-step horizontal pager. Progress bar at top with a glowing neon segment indicating completion. Large typography for questions.",
+    "dashboard": "Greeting + Core stats. Hero element: Large circular Calorie Ring with a glowing sweep effect. 4 Quick Action cards in a 2x2 grid.",
+    "meal_plan": "Timeline/vertical list of generated meals. AI reasoning displayed in secondary text. Accent borders on the left side of cards based on meal type.",
+    "scan_food": "Camera view taking top 65%. Bottom sheet with extreme blur containing results. Good/Limit/Avoid status displayed as high-contrast neon pill badges.",
+    "ai_chat": "Chat UI. AI bubbles: dark surface with 1px Cyan border and subtle cyan glow. User bubbles: dark surface without glow. Typing indicator: glowing bouncing dots.",
+    "recipe_feed": "Full-width or large bento cards. High quality imagery taking most of the card, dark gradient overlay at the bottom for text readability.",
+    "progress": "Vertical timeline. Connecting lines use border_subtle. Data points use glowing dots.",
+    "profile": "Minimalist list view. High contrast. Simple."
+  },
+  "components": {
+    "icons": "lucide-react-native",
+    "gradients": "expo-linear-gradient",
+    "blur": "expo-blur (BlurView)"
+  },
+  "image_urls": {
+    "landing_background": {
+      "url": "https://images.unsplash.com/photo-1627740660376-bc7506720b8a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHxjeWJlcnB1bmslMjBiYWNrZ3JvdW5kJTIwbmVvbnxlbnwwfHx8fDE3Nzg0Mjc4Njh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract neon lights for the landing page background"
+    },
+    "fitness_portrait_1": {
+      "url": "https://images.unsplash.com/photo-1746791006020-49722dbd821f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwyfHxmaXRuZXNzJTIwcG9ydHJhaXQlMjBuZW9ufGVufDB8fHx8MTc3ODQyNzg1MHww&ixlib=rb-4.1.0&q=85",
+      "description": "User profile or community feed placeholder"
+    },
+    "fitness_portrait_2": {
+      "url": "https://images.unsplash.com/photo-1625795057078-f714c0d86ef2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwzfHxmaXRuZXNzJTIwcG9ydHJhaXQlMjBuZW9ufGVufDB8fHx8MTc3ODQyNzg1MHww&ixlib=rb-4.1.0&q=85",
+      "description": "User profile or community feed placeholder"
+    },
+    "healthy_meal_1": {
+      "url": "https://images.unsplash.com/photo-1768326119231-bf064c1b8fdf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NDh8MHwxfHNlYXJjaHwzfHxoZWFsdGh5JTIwbWVhbCUyMHZpYnJhbnR8ZW58MHx8fHwxNzc4NDI3ODUwfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Poke bowl for Recipe Feed / Meal Plan"
+    },
+    "healthy_meal_2": {
+      "url": "https://images.unsplash.com/photo-1758721217610-a5d729a319e9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NDh8MHwxfHNlYXJjaHwyfHxoZWFsdGh5JTIwbWVhbCUyMHZpYnJhbnR8ZW58MHx8fHwxNzc4NDI3ODUwfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Salad bowl for Recipe Feed / Meal Plan"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Design for React Native + Expo. Do not use HTML/CSS or web-specific libraries like Framer Motion or Shadcn.",
+    "Use StyleSheet, Reanimated, and Expo Blur/Linear-Gradient.",
+    "Strictly follow the Dark Mode + Neon Glow archetype. Pure black base (#000000) with Flame Orange (#FF3B30) and Cyan (#00FFFF) accents.",
+    "Use deep matte blacks. Avoid generic grays.",
+    "All containers must have generous padding (24px default).",
+    "Use `Unbounded` for Headings and `Outfit` for body text. Headings must be bold and tightly tracked.",
+    "Implement glassmorphism heavily for cards, bottom navigation, and modals. Use a 1px `rgba(255,255,255,0.08)` border to give it crisp edges.",
+    "Ensure the bottom navigation is floating above the content, with a glass effect and a glowing active icon.",
+    "All interactive elements must include `testID` attribute (React Native equivalent of data-testid).",
+    "Do NOT use web-based DOM elements like <div> or <span>. Use <View>, <Text>, <Image>, <TouchableOpacity>, <ScrollView>, etc."
+  ]
+}
