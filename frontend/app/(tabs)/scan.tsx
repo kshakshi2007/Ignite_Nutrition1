@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, FileText, Sparkles, X } from 'lucide-react-native';
+import { Camera, FileText, Sparkles, X, ImageIcon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '../../src/GlassCard';
 import { ParticleField } from '../../src/ParticleField';
@@ -18,6 +18,14 @@ export default function ScanFood() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert('Permission needed', 'Allow photo access to scan an image');
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 });
+    if (r.canceled || !r.assets?.[0]) return;
+    setImage(`data:image/jpeg;base64,${r.assets[0].base64}`);
+  };
+
+  const captureImage = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return Alert.alert('Permission needed', 'Allow camera access to scan a packed food label');
+    const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.7, allowsEditing: true });
     if (r.canceled || !r.assets?.[0]) return;
     setImage(`data:image/jpeg;base64,${r.assets[0].base64}`);
   };
@@ -51,10 +59,18 @@ export default function ScanFood() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity testID="pick-image" onPress={pickImage} style={styles.uploadBtn}>
-              <Camera size={26} color={colors.cyan} />
-              <Text style={styles.uploadText}>Upload label photo</Text>
-            </TouchableOpacity>
+            <View style={styles.captureRow}>
+              <TouchableOpacity testID="capture-image" onPress={captureImage} style={[styles.captureBtn, { borderColor: colors.flame, backgroundColor: 'rgba(255,59,48,0.06)' }]}>
+                <Camera size={26} color={colors.flame} />
+                <Text style={[styles.uploadText, { color: colors.flame }]}>Scan with Camera</Text>
+                <Text style={styles.captureHint}>Point at packed food label</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="pick-image" onPress={pickImage} style={[styles.captureBtn, { borderColor: 'rgba(0,255,255,0.4)', backgroundColor: 'rgba(0,255,255,0.04)' }]}>
+                <ImageIcon size={26} color={colors.cyan} />
+                <Text style={styles.uploadText}>Upload from Gallery</Text>
+                <Text style={styles.captureHint}>Pick existing photo</Text>
+              </TouchableOpacity>
+            </View>
           )}
           <View style={styles.dividerRow}><View style={styles.divider} /><Text style={styles.dividerText}>OR</Text><View style={styles.divider} /></View>
           <View style={styles.inputBox}>
