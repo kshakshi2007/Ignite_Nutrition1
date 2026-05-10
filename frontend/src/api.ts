@@ -39,8 +39,9 @@ export const api = {
   onboarding: (data: any) => request('/profile/onboarding', { method: 'POST', body: JSON.stringify(data) }),
   updateProfile: (data: any) => request('/profile', { method: 'PUT', body: JSON.stringify(data) }),
   // Meal plan
-  generateMealPlan: (notes?: string) => request('/meal-plan/generate', { method: 'POST', body: JSON.stringify({ notes }) }),
+  generateMealPlan: (notes?: string, location?: string) => request('/meal-plan/generate', { method: 'POST', body: JSON.stringify({ notes, location }) }),
   latestMealPlan: () => request('/meal-plan/latest'),
+  estimateMacros: (name: string, notes?: string) => request('/meals/estimate-macros', { method: 'POST', body: JSON.stringify({ name, notes }) }),
   // Scan
   scan: (payload: { image_base64?: string; ingredients_text?: string }) =>
     request('/scan/analyze', { method: 'POST', body: JSON.stringify(payload) }),
@@ -55,7 +56,7 @@ export const api = {
   likeRecipe: (id: string) => request(`/recipes/${id}/like`, { method: 'POST' }),
   // Progress
   listProgress: () => request('/progress'),
-  addProgress: (data: { title: string; type: 'meal' | 'recipe'; mealType?: string; recipeId?: string }) =>
+  addProgress: (data: { title: string; type: 'meal' | 'recipe'; mealType?: string; recipeId?: string; calories?: number; protein?: number; carbs?: number; fat?: number }) =>
     request('/progress', { method: 'POST', body: JSON.stringify(data) }),
   deleteProgress: (id: string) => request(`/progress/${id}`, { method: 'DELETE' }),
 };

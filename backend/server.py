@@ -88,6 +88,11 @@ class ProfileUpdate(BaseModel):
 
 class MealPlanGenIn(BaseModel):
     notes: Optional[str] = None
+    location: Optional[str] = None  # e.g., "Mumbai, India" or "Tokyo, Japan"
+
+class MealEstimateIn(BaseModel):
+    name: str
+    notes: Optional[str] = None
 
 class ScanIn(BaseModel):
     image_base64: Optional[str] = None  # data url or pure base64
@@ -108,6 +113,10 @@ class ProgressIn(BaseModel):
     type: Literal["meal", "recipe"]
     mealType: Optional[str] = None
     recipeId: Optional[str] = None
+    calories: Optional[float] = None
+    protein: Optional[float] = None
+    carbs: Optional[float] = None
+    fat: Optional[float] = None
 
 # ============================================================
 # Helpers
@@ -296,32 +305,52 @@ async def generate_meal_plan(body: MealPlanGenIn, user=Depends(current_user)):
     sys = (
         "You are an elite nutrition coach. Generate a single-day meal plan as STRICT JSON "
         "with exactly these keys: breakfast, lunch, dinner, snack. Each value must be an object "
-        '{"name": string, "reason": string}. The reason must be 1 short sentence tailored to the user.'
-        " Output ONLY JSON, no prose, no markdown fences."
+        '{"name": string, "reason": string, "calories": number, "protein": number, "carbs": number, "fat": number}. '
+        "Macros are in grams (protein, carbs, fat) and kcal for calories — realistic per-meal values. "
+        "The reason must be 1 short sentence tailored to the user. "
+        "If a location is given, choose dishes that are popular and authentic to that region/cuisine. "
+        "Output ONLY JSON, no prose, no markdown fences."
     )
     profile = (
         f"Goal: {user.get('goal')}, Calorie target: {user.get('calorieEstimate')} kcal, "
         f"Diet: {user.get('dietType')}, Allergies: {', '.join(user.get('allergies') or []) or 'none'}, "
         f"Age: {user.get('age')}, Weight: {user.get('weight')}kg."
     )
-    user_prompt = f"User profile -> {profile}\nNotes: {body.notes or 'none'}\nReturn the JSON now."
+    location_str = (body.location or user.get("location") or "").strip()
+    user_prompt = (
+        f"User profile -> {profile}\n"
+        f"Location/Region: {location_str or 'unspecified — use globally common healthy options'}\n"
+        f"Notes: {body.notes or 'none'}\nReturn the JSON now."
+    )
     raw = await mercury_chat(
         [{"role": "system", "content": sys}, {"role": "user", "content": user_prompt}],
-        max_tokens=700,
+        max_tokens=900,
     )
     plan = extract_json(raw)
     required = ["breakfast", "lunch", "dinner", "snack"]
     if not all(k in plan and isinstance(plan[k], dict) for k in required):
         # Fallback structure
-        plan = {k: {"name": "Balanced bowl", "reason": "Tailored fallback option"} for k in required}
+        plan = {k: {"name": "Balanced bowl", "reason": "Tailored fallback option",
+                    "calories": 450, "protein": 25, "carbs": 50, "fat": 15} for k in required}
+    # Ensure each meal has macro fields
+    for k in required:
+        m = plan[k]
+        m.setdefault("calories", 450)
+        m.setdefault("protein", 25)
+        m.setdefault("carbs", 50)
+        m.setdefault("fat", 15)
     doc = {
         "id": str(uuid.uuid4()),
         "uid": user["uid"],
         "date": datetime.now(timezone.utc).date().isoformat(),
+        "location": location_str or None,
         **{k: plan[k] for k in required},
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }
     await db.mealPlans.insert_one(dict(doc))
+    # Persist user's last-used location
+    if location_str and location_str != user.get("location"):
+        await db.users.update_one({"uid": user["uid"]}, {"$set": {"location": location_str}})
     doc.pop("_id", None)
     return doc
 
@@ -331,6 +360,34 @@ async def latest_meal_plan(user=Depends(current_user)):
         {"uid": user["uid"]}, {"_id": 0}, sort=[("createdAt", -1)]
     )
     return plan or {}
+
+@api_router.post("/meals/estimate-macros")
+async def estimate_macros(body: MealEstimateIn, user=Depends(current_user)):
+    """Estimate macros for a custom user-typed meal name."""
+    sys = (
+        "You are a nutrition database. Given a meal name (and optional notes/portion), "
+        "return STRICT JSON only: "
+        '{"calories": number, "protein": number, "carbs": number, "fat": number, "portion": string}. '
+        "Macros in grams; calories in kcal. Use a typical 1-serving estimate unless portion is specified. "
+        "Output ONLY JSON."
+    )
+    raw = await mercury_chat(
+        [
+            {"role": "system", "content": sys},
+            {"role": "user", "content": f"Meal: {body.name}\nNotes/Portion: {body.notes or 'standard 1 serving'}"},
+        ],
+        max_tokens=200,
+        temperature=0.3,
+    )
+    data = extract_json(raw)
+    return {
+        "name": body.name,
+        "calories": float(data.get("calories", 400)),
+        "protein": float(data.get("protein", 20)),
+        "carbs": float(data.get("carbs", 45)),
+        "fat": float(data.get("fat", 15)),
+        "portion": data.get("portion", "1 serving"),
+    }
 
 # ============================================================
 # Food Scan
@@ -519,6 +576,10 @@ async def add_progress(body: ProgressIn, user=Depends(current_user)):
         "type": body.type,
         "mealType": body.mealType,
         "recipeId": body.recipeId,
+        "calories": body.calories,
+        "protein": body.protein,
+        "carbs": body.carbs,
+        "fat": body.fat,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "date": datetime.now(timezone.utc).date().isoformat(),
     }

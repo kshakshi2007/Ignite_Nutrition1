@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Scan packed food labels to decode ingredients",
-        "NSPhotoLibraryUsageDescription": "Pick food label photos to scan"
+        "NSPhotoLibraryUsageDescription": "Pick food label photos to scan",
+        "NSLocationWhenInUseUsageDescription": "Suggest local meals based on your region"
       }
     },
     "android": {
@@ -21,7 +22,7 @@
         "backgroundColor": "#000"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["android.permission.CAMERA", "android.permission.READ_EXTERNAL_STORAGE"]
+      "permissions": ["android.permission.CAMERA", "android.permission.READ_EXTERNAL_STORAGE", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"]
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,12 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Suggest local meals based on your region"
         }
       ]
     ],
