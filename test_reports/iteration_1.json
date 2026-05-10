@@ -1,0 +1,31 @@
+{
+  "summary": "Backend testing for Ignite Nutrition. All 15 pytest tests passed (100%). Covered: health, auth (register/login/duplicate/bad-pw/google/me), profile onboarding + BMR calc verification, profile update recalc, Mercury-2 meal-plan generation + latest, scan/analyze (text path) + 400 on empty, chat (pre_auth + authed) + history ordering, recipes (create/list/like-toggle), progress CRUD. Mercury-2 (mercury-2 model) returned valid structured JSON for meal-plan, scan, recipes; chat replies returned. JWT auth and 401 on missing token verified. Computed BMR/calories matched Mifflin-St Jeor formula exactly (Male 28y/175cm/72kg/weight_loss -> bmr=1679, calories=1850).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ignite_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/auth/google has no real Google ID-token verification — accepts any client-supplied email/name. Acceptable per spec ('lightweight pseudo-google') but is a trust boundary risk if exposed in production.",
+    "Image-scan path uses emergentintegrations Gemini; not exercised in tests (text path only) — confirm separately if image flow is required.",
+    "server.py is 561 lines — fine now, but consider splitting into routers (auth/profile/meal/scan/chat/recipes/progress) before it grows further.",
+    "Backend logs showed earlier 502s when MERCURY_MODEL was 'mercury' (account too new); current .env uses 'mercury-2' which works. Keep that pinned."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "not tested"},
+  "seed_data_creation": "Created TEST_-prefixed users, recipes, progress, and chat sessions during the run. Not cleaned up (fresh UUID emails each run).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env (note: PUBLIC_ prefix). Mercury-2 model name in backend/.env must be 'mercury-2' (not 'mercury') — older 'mercury' returns 403 model_access_denied for new accounts. Mercury-2 calls take 2-7s; tests use 90s timeouts on AI endpoints. Image-scan endpoint not tested; only ingredients_text path covered.",
+  "rca_of_issue": "N/A — no failures."
+}
