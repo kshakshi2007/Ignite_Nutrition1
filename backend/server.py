@@ -366,27 +366,51 @@ async def estimate_macros(body: MealEstimateIn, user=Depends(current_user)):
     """Estimate macros for a custom user-typed meal name."""
     sys = (
         "You are a nutrition database. Given a meal name (and optional notes/portion), "
-        "return STRICT JSON only: "
+        "return STRICT JSON only on a single line: "
         '{"calories": number, "protein": number, "carbs": number, "fat": number, "portion": string}. '
         "Macros in grams; calories in kcal. Use a typical 1-serving estimate unless portion is specified. "
-        "Output ONLY JSON."
+        "Output ONLY the JSON, nothing else."
     )
-    raw = await mercury_chat(
-        [
-            {"role": "system", "content": sys},
-            {"role": "user", "content": f"Meal: {body.name}\nNotes/Portion: {body.notes or 'standard 1 serving'}"},
-        ],
-        max_tokens=200,
-        temperature=0.3,
-    )
-    data = extract_json(raw)
+    user_msg = f"Meal: {body.name}\nNotes/Portion: {body.notes or 'standard 1 serving'}"
+
+    async def _try():
+        return await mercury_chat(
+            [
+                {"role": "system", "content": sys},
+                {"role": "user", "content": user_msg},
+            ],
+            max_tokens=400,
+            temperature=0.3,
+        )
+
+    raw = await _try()
+    data = extract_json(raw or "")
+    if not data or "calories" not in data:
+        logger.warning(f"estimate-macros: empty/invalid parse, retrying. raw={raw[:200]!r}")
+        raw = await _try()
+        data = extract_json(raw or "")
+
+    if not data or "calories" not in data:
+        logger.error(f"estimate-macros: still empty after retry. raw={raw[:200]!r}")
+        # Reasonable defaults but flagged
+        return {
+            "name": body.name,
+            "calories": 400.0,
+            "protein": 20.0,
+            "carbs": 45.0,
+            "fat": 15.0,
+            "portion": "1 serving (estimated)",
+            "estimated": False,
+        }
+
     return {
         "name": body.name,
         "calories": float(data.get("calories", 400)),
         "protein": float(data.get("protein", 20)),
         "carbs": float(data.get("carbs", 45)),
         "fat": float(data.get("fat", 15)),
-        "portion": data.get("portion", "1 serving"),
+        "portion": str(data.get("portion", "1 serving")),
+        "estimated": True,
     }
 
 # ============================================================
