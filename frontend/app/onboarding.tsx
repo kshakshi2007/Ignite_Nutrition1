@@ -5,6 +5,7 @@ import { ArrowRight, ArrowLeft, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ParticleField } from '../src/ParticleField';
 import { GlassCard } from '../src/GlassCard';
+import { Screen } from '../src/Screen';
 import { colors, fonts, radius, spacing } from '../src/theme';
 import { api } from '../src/api';
 import { useAuth } from '../src/auth';
@@ -58,7 +59,7 @@ export default function Onboarding() {
   const toggleAllergy = (a: string) => setAllergies(allergies.includes(a) ? allergies.filter(x => x !== a) : [...allergies, a]);
 
   return (
-    <View style={styles.root}>
+    <Screen edges={{ top: true, bottom: true }}>
       <ParticleField />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -154,13 +155,13 @@ export default function Onboarding() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.lg, paddingTop: 80, paddingBottom: 40 },
+  scroll: { padding: spacing.lg, paddingTop: spacing.xl, paddingBottom: 40 },
   label: { color: colors.cyan, fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 3 },
   progressBar: { height: 6, marginTop: spacing.sm, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },

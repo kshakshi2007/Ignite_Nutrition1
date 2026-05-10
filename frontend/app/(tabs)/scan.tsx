@@ -5,6 +5,7 @@ import { Camera, FileText, Sparkles, X, ImageIcon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '../../src/GlassCard';
 import { ParticleField } from '../../src/ParticleField';
+import { Screen } from '../../src/Screen';
 import { colors, fonts, radius, spacing } from '../../src/theme';
 import { api } from '../../src/api';
 
@@ -43,7 +44,7 @@ export default function ScanFood() {
   const verdictColor = (v?: string) => ({ good: colors.good, limit: colors.limit, avoid: colors.avoid } as any)[v || ''] || colors.textMuted;
 
   return (
-    <View style={styles.root}>
+    <Screen>
       <ParticleField />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.label}>SCANNER</Text>
@@ -119,13 +120,13 @@ export default function ScanFood() {
         )}
         <View style={{ height: 120 }} />
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.lg, paddingTop: 70 },
+  scroll: { padding: spacing.lg, paddingTop: spacing.lg },
   label: { color: colors.cyan, fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 3 },
   title: { fontFamily: fonts.heading700, fontSize: 32, color: colors.textPrimary, letterSpacing: -1, marginTop: 4 },
   sub: { color: colors.textSecondary, fontFamily: fonts.body, fontSize: 14, marginBottom: spacing.lg },

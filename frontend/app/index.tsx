@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../src/auth';
 import { ParticleField } from '../src/ParticleField';
 import { GlassCard } from '../src/GlassCard';
+import { Screen } from '../src/Screen';
 import { colors, fonts, spacing, radius } from '../src/theme';
 import { api } from '../src/api';
 
@@ -70,7 +71,7 @@ export default function Landing() {
   }
 
   return (
-    <View style={styles.root}>
+    <Screen edges={{ top: true, bottom: true }}>
       <ParticleField />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -183,21 +184,21 @@ export default function Landing() {
           <View style={{ height: 60 }} />
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   loadingScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingHorizontal: spacing.lg, paddingTop: 80, paddingBottom: 40 },
+  scroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: 40 },
   heroWrap: { alignItems: 'center', marginBottom: spacing.xl },
   flameBadge: {
     width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,59,48,0.12)',
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,59,48,0.4)',
     marginBottom: spacing.md, shadowColor: colors.flame, shadowOpacity: 0.6, shadowRadius: 18, shadowOffset: { width: 0, height: 0 },
   },
-  brand: { fontFamily: fonts.heading900, fontSize: 56, color: colors.textPrimary, letterSpacing: -2, lineHeight: 60 },
+  brand: { fontFamily: fonts.heading900, fontSize: 48, color: colors.textPrimary, letterSpacing: -2, lineHeight: 52 },
   brandSub: { fontFamily: fonts.bodySemi, fontSize: 14, letterSpacing: 6, color: colors.flame, marginTop: -4 },
   tagline: { fontFamily: fonts.body, fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md, lineHeight: 22, paddingHorizontal: spacing.md },
   primaryBtn: { marginTop: spacing.xl, width: '100%', borderRadius: radius.full, overflow: 'hidden', shadowColor: colors.flame, shadowRadius: 20, shadowOpacity: 0.6, shadowOffset: { width: 0, height: 0 } },

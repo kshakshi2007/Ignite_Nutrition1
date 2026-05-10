@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../src/auth';
 import { GlassCard } from '../src/GlassCard';
 import { ParticleField } from '../src/ParticleField';
+import { Screen } from '../src/Screen';
 import { colors, fonts, radius, spacing } from '../src/theme';
 import { api } from '../src/api';
 
@@ -43,7 +44,7 @@ export default function Profile() {
   const toggleAllergy = (a: string) => setAllergies(allergies.includes(a) ? allergies.filter(x => x !== a) : [...allergies, a]);
 
   return (
-    <View style={styles.root}>
+    <Screen edges={{ top: true, bottom: true }}>
       <ParticleField />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
@@ -120,13 +121,13 @@ export default function Profile() {
         </GlassCard>
         <View style={{ height: 60 }} />
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.lg, paddingTop: 60 },
+  scroll: { padding: spacing.lg, paddingTop: spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderSubtle, backgroundColor: 'rgba(255,255,255,0.04)' },
   title: { fontFamily: fonts.heading700, fontSize: 22, color: colors.textPrimary },

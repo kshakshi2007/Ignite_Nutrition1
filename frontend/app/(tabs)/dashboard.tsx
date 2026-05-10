@@ -34,7 +34,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <View style={styles.root}>
+    <Screen>
       <ParticleField />
       <ScrollView contentContainerStyle={styles.scroll} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.flame} />}>
         <View style={styles.header}>
@@ -106,7 +106,7 @@ export default function Dashboard() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
@@ -121,7 +121,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.lg, paddingTop: 70 },
+  scroll: { padding: spacing.lg, paddingTop: spacing.lg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   greeting: { fontFamily: fonts.heading700, fontSize: 28, color: colors.textPrimary, letterSpacing: -0.8 },
   subGreeting: { fontFamily: fonts.body, fontSize: 14, color: colors.textSecondary, marginTop: 2 },
@@ -148,4 +148,6 @@ const styles = StyleSheet.create({
   activityTitle: { fontFamily: fonts.bodySemi, color: colors.textPrimary, fontSize: 14 },
   activityMeta: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 11, marginTop: 2 },
   empty: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 13, fontStyle: 'italic' },
+});
+ze: 13, fontStyle: 'italic' },
 });

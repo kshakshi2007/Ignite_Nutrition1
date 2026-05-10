@@ -4,6 +4,7 @@ import { Heart, Plus, BookPlus, X, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '../../src/GlassCard';
 import { ParticleField } from '../../src/ParticleField';
+import { Screen } from '../../src/Screen';
 import { colors, fonts, radius, spacing } from '../../src/theme';
 import { api } from '../../src/api';
 import { useAuth } from '../../src/auth';
@@ -49,13 +50,13 @@ export default function Feed() {
   };
 
   return (
-    <View style={styles.root}>
+    <Screen>
       <ParticleField />
       <ScrollView contentContainerStyle={styles.scroll} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.flame} />}>
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1, marginRight: spacing.md }}>
             <Text style={styles.label}>FUEL FEED</Text>
-            <Text style={styles.title}>Community Recipes</Text>
+            <Text style={styles.title} numberOfLines={1}>Community Recipes</Text>
           </View>
           <TouchableOpacity testID="open-upload" onPress={() => setOpen(true)} style={styles.fab}>
             <Plus size={20} color="#000" />
@@ -125,16 +126,16 @@ export default function Feed() {
           </View>
         </View>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.lg, paddingTop: 70 },
+  scroll: { padding: spacing.lg, paddingTop: spacing.lg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.lg },
   label: { color: colors.cyan, fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 3 },
-  title: { fontFamily: fonts.heading700, fontSize: 28, color: colors.textPrimary, letterSpacing: -0.8, marginTop: 4 },
+  title: { fontFamily: fonts.heading700, fontSize: 26, color: colors.textPrimary, letterSpacing: -0.8, marginTop: 4 },
   fab: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.flame, alignItems: 'center', justifyContent: 'center', shadowColor: colors.flame, shadowOpacity: 0.6, shadowRadius: 14 },
   empty: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
   tagRow: { flexDirection: 'row', gap: 6, marginBottom: spacing.sm, flexWrap: 'wrap' },

@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Keyboa
 import { Send, Sparkles } from 'lucide-react-native';
 import Markdown from 'react-native-markdown-display';
 import { ParticleField } from '../../src/ParticleField';
+import { Screen } from '../../src/Screen';
 import { colors, fonts, radius, spacing } from '../../src/theme';
 import { api } from '../../src/api';
 import { useAuth } from '../../src/auth';
@@ -38,7 +39,7 @@ export default function Chat() {
   };
 
   return (
-    <View style={styles.root}>
+    <Screen>
       <ParticleField />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={20}>
         <View style={styles.header}>
@@ -74,7 +75,7 @@ export default function Chat() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </Screen>
   );
 }
 
@@ -88,7 +89,7 @@ const mdStyles = {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 60, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+  header: { paddingTop: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
   iconRing: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.cyan, backgroundColor: 'rgba(0,255,255,0.08)', shadowColor: colors.cyan, shadowOpacity: 0.6, shadowRadius: 12 },
   title: { fontFamily: fonts.heading700, fontSize: 22, color: colors.textPrimary, letterSpacing: -0.5 },
   sub: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
