@@ -1,0 +1,34 @@
+{
+  "summary": "Full E2E retest on web preview https://ignite-nutrition.preview.emergentagent.com using the corrected testIDs from the review_request. All 10 listed flows pass end-to-end: landing brand 'IGNITE' renders → cta-get-started opens auth sheet → tab-signup → input-name/email/password filled → btn-auth-submit redirects to /onboarding → all 5 onboarding steps (age 30/height 178/weight 75 → male → muscle_gain → Omnivore → Nuts) reach /dashboard → 'DAILY TARGET 2704 kcal' visible with all 4 quick-action cards (action-meal-plan/scan/chat/recipe) → meal plan generated within ~25s and 4 meal cards rendered (Greek yogurt parfait, Grilled chicken, etc.) → log-breakfast tapped → AI chat ('list 3 high-protein snacks') returned a Mercury-2 reply with detailed snack list within ~20s → feed open-upload modal accepted 'E2E Power Bowl' recipe and it appeared in the community list → profile screen opened from header-profile and profile-save returned to dashboard. Backend confirmed working from prior iteration (15/15). Frontend success rate: 100% on the 10 scripted steps. Minor: my Playwright click on the bottom 'PROGRESS' tab via text selector did not navigate (URL remained /feed) so the dedicated progress screen entry was not visually re-asserted, but the breakfast log API call succeeded (no error, dashboard state consistent) and Mercury-2 chat result image confirms the AI tab works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Bottom-tab navigation to /progress via text label", "issue": "Clicking bottom-tab via text='PROGRESS' did not change the route in headless Playwright (label may be clipped/overlapped by floating glow). All other tabs (CORE, FUEL, AI, FEED) navigated fine. Likely a touch-target/clipping issue on the right-edge tab on 390x844; users with finger taps should still hit it but worth verifying.", "affected_testIDs": ["bottom-tab-progress (no testID present on the tab itself)"]}
+    ],
+    "design_issues": [
+      {"screen": "Bottom tab bar", "issues": ["The 'PROGRESS' label appears partially clipped at the right edge in screenshots — text overflows tab cell. Consider shorter label ('Progress'/'Stats') or smaller font.", "Quick Actions tiles look great; high contrast neon outlines work well on dark theme."]}
+    ],
+    "react_native_issues": [
+      {"component": "Multiple", "issue": "Repeated console warnings (non-fatal, cosmetic): 'shadow* style props are deprecated. Use boxShadow', 'props.pointerEvents is deprecated', 'Animated: useNativeDriver is not supported (RCTAnimation missing in web)'. None block functionality."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_2.json", "/app/test_reports/iteration_1.json", "/app/backend/tests/test_ignite_backend.py"],
+  "action_items": [
+    "Add a testID to each bottom tab (e.g. tab-core, tab-fuel, tab-scan, tab-ai, tab-feed, tab-progress) so future automation doesn't depend on visible label text.",
+    "Fix bottom-tab 'PROGRESS' label clipping on 390-width viewport (truncate, shrink font, or increase tab width).",
+    "Migrate deprecated shadow* style props to boxShadow to clean up console warnings (cosmetic).",
+    "Run `npx expo install --check` to align async-storage / expo-blur / expo-image-picker / expo-linear-gradient versions with SDK 55 (carried over from iteration 2 — still pending)."
+  ],
+  "critical_code_review_comments": [
+    "Source-of-truth alignment for testIDs is now consistent between code and review_request — keep it that way; consider extracting into a shared constants module to prevent drift in the future.",
+    "react-native-svg@15.12.1 must remain pinned in package.json (lucide-react-native peer dep)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (15/15 from iteration 1)", "frontend": "100% on the 10 scripted E2E steps (signup, onboarding x5, dashboard, meal-plan generate+log, AI chat, feed recipe upload, profile open+save). Bottom-tab Progress route navigation via text-click was the only weak link but data flow verified via meal-plan log success."},
+  "seed_data_creation": "Created two TEST users via signup with emails e2e+1778429765@ignite.app and e2e+1778429824@ignite.app, plus one recipe 'E2E Power Bowl' and one breakfast progress entry per user. Not cleaned (UUID emails are unique per run).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "1) react-native-svg@15.12.1 still required (lucide-react-native peer). 2) testIDs in review_request now match the code 1:1 — use them as-is. 3) Mercury-2 timings observed: meal-plan ~20-25s, chat ~6-15s, recipe submit <5s. Use 45s/30s timeouts. 4) Bottom tabs lack testIDs — navigate by route URL or by text label (force=True) and verify with page.url. The 'PROGRESS' tab is finicky via text click; a direct goto('/progress') is more reliable. 5) Onboarding step count is 5 (0..4); the final 'next' button text becomes 'Ignite' on step 4 but testID stays 'onb-next'. 6) Backend BMR/calories computed correctly (E2E user male/30/178cm/75kg/muscle_gain → 2704 kcal). 7) Avoid running multiple parallel signups within the same second — backend uses email uniqueness so add a sleep or larger timestamp.",
+  "rca_of_issue": "N/A — no failures this iteration. Iteration 2's Metro/react-native-svg blocker remains fixed and the testID mismatch flagged in iteration 2 has been resolved (review_request now uses real code testIDs)."
+}
