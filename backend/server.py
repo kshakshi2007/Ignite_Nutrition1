@@ -1,39 +1,42 @@
-"""Ignite Nutrition - FastAPI Backend
+"""Ignite Nutrition - FastAPI Backend (Supabase Edition)
 AI-powered nutrition tracking with Mercury-2 (Inception Labs) for chat/meal-plans/recipes
 and Gemini multimodal for food image scanning.
+Database: Supabase PostgreSQL via supabase-py SDK
+Auth: Supabase Auth (email/password + Google OAuth)
 """
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import json
 import re
 import uuid
-import bcrypt
-import jwt as pyjwt
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, timezone, timedelta
 from openai import AsyncOpenAI
+import httpx
+
+# Supabase client
+from supabase import create_client, Client
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
-JWT_SECRET = os.environ["JWT_SECRET"]
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 INCEPTION_API_KEY = os.environ["INCEPTION_API_KEY"]
 INCEPTION_BASE_URL = os.environ.get("INCEPTION_BASE_URL", "https://api.inceptionlabs.ai/v1")
 MERCURY_MODEL = os.environ.get("MERCURY_MODEL", "mercury")
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
-# ---------- DB ----------
-client = AsyncIOMotorClient(MONGO_URL)
-db = client[DB_NAME]
+# ---------- Supabase Client ----------
+# Using service_role key for backend-to-database operations
+# Frontend uses anon key with RLS policies
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # ---------- LLM Clients ----------
 mercury_client = AsyncOpenAI(api_key=INCEPTION_API_KEY, base_url=INCEPTION_BASE_URL)
@@ -119,34 +122,56 @@ class ProgressIn(BaseModel):
     fat: Optional[float] = None
 
 # ============================================================
-# Helpers
+# Auth Helpers — Supabase JWT Verification
 # ============================================================
-def hash_pw(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
-
-def verify_pw(pw: str, hashed: str) -> bool:
+async def verify_supabase_token(token: str) -> dict:
+    """Verify a Supabase JWT and return the user data."""
     try:
-        return bcrypt.checkpw(pw.encode(), hashed.encode())
-    except Exception:
-        return False
-
-def make_token(uid: str) -> str:
-    payload = {"uid": uid, "exp": datetime.now(timezone.utc) + timedelta(days=30)}
-    return pyjwt.encode(payload, JWT_SECRET, algorithm="HS256")
+        # Use Supabase's built-in JWT verification via the SDK
+        response = supabase.auth.get_user(token)
+        if response and response.user:
+            user_data = response.user
+            return {
+                "id": user_data.id,
+                "email": user_data.email,
+                "name": user_data.user_metadata.get("name", ""),
+                "picture": user_data.user_metadata.get("avatar_url", ""),
+            }
+        raise HTTPException(401, "Invalid token")
+    except Exception as e:
+        logger.error(f"Token verification error: {e}")
+        raise HTTPException(401, "Invalid or expired token")
 
 async def current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     if not creds:
         raise HTTPException(401, "Missing authorization")
-    try:
-        payload = pyjwt.decode(creds.credentials, JWT_SECRET, algorithms=["HS256"])
-        uid = payload["uid"]
-    except Exception:
-        raise HTTPException(401, "Invalid token")
-    user = await db.users.find_one({"uid": uid}, {"_id": 0, "passwordHash": 0})
-    if not user:
-        raise HTTPException(401, "User not found")
-    return user
+    token = creds.credentials
+    auth_user = await verify_supabase_token(token)
 
+    # Get or create user profile in our users table
+    result = supabase.table("users").select("*").eq("id", auth_user["id"]).execute()
+    if result.data and len(result.data) > 0:
+        return result.data[0]
+
+    # First login — create profile entry
+    new_user = {
+        "id": auth_user["id"],
+        "email": auth_user["email"],
+        "name": auth_user.get("name", auth_user["email"].split("@")[0]),
+        "avatar_url": auth_user.get("picture", ""),
+        "onboarded": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    supabase.table("users").insert(new_user).execute()
+    return new_user
+
+def fmt_user(u: dict) -> dict:
+    """Format user dict for API response (remove sensitive fields)."""
+    return {k: v for k, v in u.items() if k not in ("_id",)}
+
+# ============================================================
+# Calorie Formula (unchanged)
+# ============================================================
 def calc_bmr(age: int, height: float, weight: float, gender: str) -> float:
     # Mifflin-St Jeor
     if gender == "male":
@@ -171,9 +196,192 @@ def goal_summary(goal: str) -> str:
         "maintenance": "Balanced intake to maintain current weight",
     }.get(goal, "Custom nutrition goal")
 
-def serialize_user(u: dict) -> dict:
-    u = {k: v for k, v in u.items() if k not in ("_id", "passwordHash")}
-    return u
+# ============================================================
+# Auth Endpoints — Supabase Auth
+# ============================================================
+@api_router.post("/auth/register")
+async def register(body: RegisterIn):
+    try:
+        response = supabase.auth.sign_up({
+            "email": body.email,
+            "password": body.password,
+            "options": {
+                "data": {
+                    "name": body.name or body.email.split("@")[0],
+                }
+            }
+        })
+        if not response.user:
+            raise HTTPException(400, "Registration failed")
+
+        user_data = response.user
+        # Create entry in our users table
+        new_user = {
+            "id": user_data.id,
+            "email": body.email.lower(),
+            "name": body.name or body.email.split("@")[0],
+            "onboarded": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        supabase.table("users").insert(new_user).execute()
+
+        return {
+            "token": user_data.id,  # Supabase manages tokens on frontend side
+            "user": new_user
+        }
+    except Exception as e:
+        error_msg = str(e)
+        if "already registered" in error_msg.lower():
+            raise HTTPException(400, "Email already registered")
+        logger.error(f"Registration error: {e}")
+        raise HTTPException(400, f"Registration failed: {error_msg[:200]}")
+
+@api_router.post("/auth/login")
+async def login(body: LoginIn):
+    try:
+        response = supabase.auth.sign_in_with_password({
+            "email": body.email,
+            "password": body.password,
+        })
+        if not response.user or not response.session:
+            raise HTTPException(401, "Invalid email or password")
+
+        # Get user profile from our table
+        result = supabase.table("users").select("*").eq("id", response.user.id).execute()
+        user_data = result.data[0] if result.data else {
+            "id": response.user.id,
+            "email": body.email.lower(),
+            "name": response.user.user_metadata.get("name", body.email.split("@")[0]),
+            "onboarded": False,
+        }
+
+        return {
+            "token": response.session.access_token,
+            "user": fmt_user(user_data)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(401, "Invalid email or password")
+
+@api_router.post("/auth/google")
+async def google_auth(body: GoogleAuthIn):
+    """Lightweight Google auth — accepts email/name token from client.
+    In production, use Supabase OAuth flow instead."""
+    try:
+        # Check if user exists in our table
+        result = supabase.table("users").select("*").eq("email", body.email.lower()).execute()
+
+        if result.data and len(result.data) > 0:
+            user_data = result.data[0]
+        else:
+            # Create new user (no password — Google-authenticated users sign in via Supabase OAuth)
+            import hashlib
+            fake_password = hashlib.sha256(f"{body.email}_{uuid.uuid4()}".encode()).hexdigest()[:20]
+            auth_response = supabase.auth.sign_up({
+                "email": body.email,
+                "password": fake_password,
+                "options": {"data": {"name": body.name or body.email.split("@")[0]}}
+            })
+
+            new_user = {
+                "id": auth_response.user.id,
+                "email": body.email.lower(),
+                "name": body.name or body.email.split("@")[0],
+                "avatar_url": body.picture or "",
+                "onboarded": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            supabase.table("users").insert(new_user).execute()
+            user_data = new_user
+
+        # For actual Google OAuth, frontend should use supabase.auth.signInWithOAuth({provider: 'google'})
+        # This endpoint provides a lightweight fallback
+        return {
+            "token": user_data.get("id", ""),
+            "user": fmt_user(user_data)
+        }
+    except Exception as e:
+        logger.error(f"Google auth error: {e}")
+        raise HTTPException(400, f"Google auth failed: {str(e)[:200]}")
+
+@api_router.get("/auth/me")
+async def me(user=Depends(current_user)):
+    return fmt_user(user)
+
+# ============================================================
+# Profile / Onboarding
+# ============================================================
+@api_router.post("/profile/onboarding")
+async def onboarding(body: OnboardingIn, user=Depends(current_user)):
+    bmr = calc_bmr(body.age, body.height, body.weight, body.gender)
+    maintenance = bmr * 1.4
+    target = round(maintenance + goal_adjustment(body.goal))
+
+    update_data = {
+        "age": body.age,
+        "height": body.height,
+        "weight": body.weight,
+        "gender": body.gender,
+        "goal": body.goal,
+        "diet_type": body.dietType,
+        "allergies": body.allergies,
+        "bmr": round(bmr),
+        "calorie_estimate": target,
+        "goal_summary": goal_summary(body.goal),
+        "onboarded": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    supabase.table("users").update(update_data).eq("id", user["id"]).execute()
+    result = supabase.table("users").select("*").eq("id", user["id"]).execute()
+    return result.data[0] if result.data else update_data
+
+@api_router.put("/profile")
+async def update_profile(body: ProfileUpdate, user=Depends(current_user)):
+    patch = {k: v for k, v in body.dict().items() if v is not None}
+
+    # Map camelCase frontend fields to snake_case DB columns
+    field_map = {
+        "dietType": "diet_type",
+        "goalSummary": "goal_summary",
+        "calorieEstimate": "calorie_estimate",
+    }
+    mapped_patch = {}
+    for k, v in patch.items():
+        db_key = field_map.get(k, k)
+        mapped_patch[db_key] = v
+
+    # Recompute BMR if relevant fields changed
+    merged = {**user, **mapped_patch}
+    if all(k in merged for k in ("age", "height", "weight", "gender", "goal")):
+        bmr = calc_bmr(merged["age"], merged["height"], merged["weight"], merged["gender"])
+        mapped_patch["bmr"] = round(bmr)
+        mapped_patch["calorie_estimate"] = round(bmr * 1.4 + goal_adjustment(merged["goal"]))
+        mapped_patch["goal_summary"] = goal_summary(merged["goal"])
+
+    mapped_patch["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    supabase.table("users").update(mapped_patch).eq("id", user["id"]).execute()
+    result = supabase.table("users").select("*").eq("id", user["id"]).execute()
+    return result.data[0] if result.data else mapped_patch
+
+# ============================================================
+# Mercury-2 helpers (unchanged)
+# ============================================================
+async def mercury_chat(messages: list, max_tokens: int = 1200, temperature: float = 0.7) -> str:
+    try:
+        resp = await mercury_client.chat.completions.create(
+            model=MERCURY_MODEL,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return resp.choices[0].message.content or ""
+    except Exception as e:
+        logger.error(f"Mercury error: {e}")
+        raise HTTPException(502, f"AI service error: {str(e)[:200]}")
 
 def extract_json(text: str) -> dict:
     """Extract first JSON object from a model response."""
@@ -194,114 +402,13 @@ def extract_json(text: str) -> dict:
     return {}
 
 # ============================================================
-# Auth
-# ============================================================
-@api_router.post("/auth/register", response_model=TokenOut)
-async def register(body: RegisterIn):
-    existing = await db.users.find_one({"email": body.email.lower()})
-    if existing:
-        raise HTTPException(400, "Email already registered")
-    uid = str(uuid.uuid4())
-    user_doc = {
-        "uid": uid,
-        "email": body.email.lower(),
-        "name": body.name or body.email.split("@")[0],
-        "passwordHash": hash_pw(body.password),
-        "provider": "email",
-        "onboarded": False,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.users.insert_one(user_doc)
-    return {"token": make_token(uid), "user": serialize_user(user_doc)}
-
-@api_router.post("/auth/login", response_model=TokenOut)
-async def login(body: LoginIn):
-    u = await db.users.find_one({"email": body.email.lower()})
-    if not u or not u.get("passwordHash") or not verify_pw(body.password, u["passwordHash"]):
-        raise HTTPException(401, "Invalid email or password")
-    return {"token": make_token(u["uid"]), "user": serialize_user(u)}
-
-@api_router.post("/auth/google", response_model=TokenOut)
-async def google_auth(body: GoogleAuthIn):
-    """Lightweight Google auth — accepts email/name from client (e.g., from Emergent Google Auth flow).
-    Creates account if missing."""
-    u = await db.users.find_one({"email": body.email.lower()})
-    if not u:
-        uid = str(uuid.uuid4())
-        u = {
-            "uid": uid,
-            "email": body.email.lower(),
-            "name": body.name or body.email.split("@")[0],
-            "picture": body.picture,
-            "provider": "google",
-            "onboarded": False,
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.users.insert_one(dict(u))
-    return {"token": make_token(u["uid"]), "user": serialize_user(u)}
-
-@api_router.get("/auth/me")
-async def me(user=Depends(current_user)):
-    return user
-
-# ============================================================
-# Profile / Onboarding
-# ============================================================
-@api_router.post("/profile/onboarding")
-async def onboarding(body: OnboardingIn, user=Depends(current_user)):
-    bmr = calc_bmr(body.age, body.height, body.weight, body.gender)
-    # Apply mild activity factor (1.4) for base maintenance
-    maintenance = bmr * 1.4
-    target = round(maintenance + goal_adjustment(body.goal))
-    update = {
-        **body.dict(),
-        "bmr": round(bmr),
-        "calorieEstimate": target,
-        "goalSummary": goal_summary(body.goal),
-        "onboarded": True,
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.users.update_one({"uid": user["uid"]}, {"$set": update})
-    fresh = await db.users.find_one({"uid": user["uid"]}, {"_id": 0, "passwordHash": 0})
-    return fresh
-
-@api_router.put("/profile")
-async def update_profile(body: ProfileUpdate, user=Depends(current_user)):
-    patch = {k: v for k, v in body.dict().items() if v is not None}
-    # Recompute BMR if relevant fields changed
-    merged = {**user, **patch}
-    if all(k in merged for k in ("age", "height", "weight", "gender", "goal")):
-        bmr = calc_bmr(merged["age"], merged["height"], merged["weight"], merged["gender"])
-        patch["bmr"] = round(bmr)
-        patch["calorieEstimate"] = round(bmr * 1.4 + goal_adjustment(merged["goal"]))
-        patch["goalSummary"] = goal_summary(merged["goal"])
-    patch["updatedAt"] = datetime.now(timezone.utc).isoformat()
-    await db.users.update_one({"uid": user["uid"]}, {"$set": patch})
-    return await db.users.find_one({"uid": user["uid"]}, {"_id": 0, "passwordHash": 0})
-
-# ============================================================
-# Mercury-2 helpers
-# ============================================================
-async def mercury_chat(messages: list, max_tokens: int = 1200, temperature: float = 0.7) -> str:
-    try:
-        resp = await mercury_client.chat.completions.create(
-            model=MERCURY_MODEL,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        return resp.choices[0].message.content or ""
-    except Exception as e:
-        logger.error(f"Mercury error: {e}")
-        raise HTTPException(502, f"AI service error: {str(e)[:200]}")
-
-# ============================================================
 # Meal Plan
 # ============================================================
 @api_router.post("/meal-plan/generate")
 async def generate_meal_plan(body: MealPlanGenIn, user=Depends(current_user)):
     if not user.get("onboarded"):
         raise HTTPException(400, "Complete onboarding first")
+
     sys = (
         "You are an elite nutrition coach. Generate a single-day meal plan as STRICT JSON "
         "with exactly these keys: breakfast, lunch, dinner, snack. Each value must be an object "
@@ -312,8 +419,8 @@ async def generate_meal_plan(body: MealPlanGenIn, user=Depends(current_user)):
         "Output ONLY JSON, no prose, no markdown fences."
     )
     profile = (
-        f"Goal: {user.get('goal')}, Calorie target: {user.get('calorieEstimate')} kcal, "
-        f"Diet: {user.get('dietType')}, Allergies: {', '.join(user.get('allergies') or []) or 'none'}, "
+        f"Goal: {user.get('goal')}, Calorie target: {user.get('calorie_estimate')} kcal, "
+        f"Diet: {user.get('diet_type')}, Allergies: {', '.join(user.get('allergies') or []) or 'none'}, "
         f"Age: {user.get('age')}, Weight: {user.get('weight')}kg."
     )
     location_str = (body.location or user.get("location") or "").strip()
@@ -329,37 +436,58 @@ async def generate_meal_plan(body: MealPlanGenIn, user=Depends(current_user)):
     plan = extract_json(raw)
     required = ["breakfast", "lunch", "dinner", "snack"]
     if not all(k in plan and isinstance(plan[k], dict) for k in required):
-        # Fallback structure
         plan = {k: {"name": "Balanced bowl", "reason": "Tailored fallback option",
                     "calories": 450, "protein": 25, "carbs": 50, "fat": 15} for k in required}
-    # Ensure each meal has macro fields
+
     for k in required:
         m = plan[k]
         m.setdefault("calories", 450)
         m.setdefault("protein", 25)
         m.setdefault("carbs", 50)
         m.setdefault("fat", 15)
+
     doc = {
-        "id": str(uuid.uuid4()),
-        "uid": user["uid"],
+        "uid": user["id"],
         "date": datetime.now(timezone.utc).date().isoformat(),
         "location": location_str or None,
-        **{k: plan[k] for k in required},
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "breakfast": json.dumps(plan["breakfast"]),
+        "lunch": json.dumps(plan["lunch"]),
+        "dinner": json.dumps(plan["dinner"]),
+        "snack": json.dumps(plan["snack"]),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.mealPlans.insert_one(dict(doc))
-    # Persist user's last-used location
+
+    result = supabase.table("meal_plans").insert(doc).execute()
+    created = result.data[0] if result.data else doc
+
+    # Parse JSON strings back to objects for response
+    for meal in ["breakfast", "lunch", "dinner", "snack"]:
+        if isinstance(created.get(meal), str):
+            created[meal] = json.loads(created[meal])
+
+    # Update user location if provided
     if location_str and location_str != user.get("location"):
-        await db.users.update_one({"uid": user["uid"]}, {"$set": {"location": location_str}})
-    doc.pop("_id", None)
-    return doc
+        supabase.table("users").update({"location": location_str}).eq("id", user["id"]).execute()
+
+    return created
 
 @api_router.get("/meal-plan/latest")
 async def latest_meal_plan(user=Depends(current_user)):
-    plan = await db.mealPlans.find_one(
-        {"uid": user["uid"]}, {"_id": 0}, sort=[("createdAt", -1)]
-    )
-    return plan or {}
+    result = supabase.table("meal_plans") \
+        .select("*") \
+        .eq("uid", user["id"]) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if result.data and len(result.data) > 0:
+        plan = result.data[0]
+        # Parse JSON strings to objects
+        for meal in ["breakfast", "lunch", "dinner", "snack"]:
+            if isinstance(plan.get(meal), str):
+                plan[meal] = json.loads(plan[meal])
+        return plan
+    return {}
 
 @api_router.post("/meals/estimate-macros")
 async def estimate_macros(body: MealEstimateIn, user=Depends(current_user)):
@@ -375,10 +503,7 @@ async def estimate_macros(body: MealEstimateIn, user=Depends(current_user)):
 
     async def _try():
         return await mercury_chat(
-            [
-                {"role": "system", "content": sys},
-                {"role": "user", "content": user_msg},
-            ],
+            [{"role": "system", "content": sys}, {"role": "user", "content": user_msg}],
             max_tokens=400,
             temperature=0.3,
         )
@@ -392,7 +517,6 @@ async def estimate_macros(body: MealEstimateIn, user=Depends(current_user)):
 
     if not data or "calories" not in data:
         logger.error(f"estimate-macros: still empty after retry. raw={raw[:200]!r}")
-        # Reasonable defaults but flagged
         return {
             "name": body.name,
             "calories": 400.0,
@@ -454,13 +578,10 @@ async def scan_analyze(body: ScanIn, user=Depends(current_user)):
     )
     user_ctx = (
         f"User allergies: {', '.join(user.get('allergies') or []) or 'none'}. "
-        f"Diet: {user.get('dietType') or 'none'}. "
+        f"Diet: {user.get('diet_type') or 'none'}. "
     )
     raw = await mercury_chat(
-        [
-            {"role": "system", "content": sys},
-            {"role": "user", "content": f"{user_ctx}\nIngredients: {ingredients_text}"},
-        ],
+        [{"role": "system", "content": sys}, {"role": "user", "content": f"{user_ctx}\nIngredients: {ingredients_text}"}],
         max_tokens=900,
     )
     data = extract_json(raw)
@@ -477,31 +598,39 @@ async def scan_analyze(body: ScanIn, user=Depends(current_user)):
 # AI Chat
 # ============================================================
 @api_router.post("/chat/send")
-async def chat_send(body: ChatMessageIn, creds: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+async def chat_send(body: ChatMessageIn, authorization: Optional[str] = Header(None)):
     user = None
-    if creds and not body.pre_auth:
+
+    # Try to authenticate if not pre-auth
+    if authorization and not body.pre_auth:
         try:
-            payload = pyjwt.decode(creds.credentials, JWT_SECRET, algorithms=["HS256"])
-            user = await db.users.find_one({"uid": payload["uid"]}, {"_id": 0, "passwordHash": 0})
+            token = authorization.replace("Bearer ", "")
+            auth_user = await verify_supabase_token(token)
+            result = supabase.table("users").select("*").eq("id", auth_user["id"]).execute()
+            if result.data:
+                user = result.data[0]
         except Exception:
             user = None
 
     # Persist user message
     now = datetime.now(timezone.utc).isoformat()
-    await db.chatMessages.insert_one({
-        "id": str(uuid.uuid4()),
+    supabase.table("chat_messages").insert({
         "session_id": body.session_id,
-        "uid": user["uid"] if user else None,
+        "uid": user["id"] if user else None,
         "role": "user",
         "content": body.message,
-        "createdAt": now,
-    })
+        "created_at": now,
+    }).execute()
 
     # Pull last 20 messages for context
-    history_cur = db.chatMessages.find(
-        {"session_id": body.session_id}, {"_id": 0, "role": 1, "content": 1}
-    ).sort("createdAt", 1).limit(40)
-    history = await history_cur.to_list(40)
+    history_result = supabase.table("chat_messages") \
+        .select("role, content") \
+        .eq("session_id", body.session_id) \
+        .order("created_at", desc=False) \
+        .limit(40) \
+        .execute()
+
+    history = history_result.data if history_result.data else []
 
     sys = (
         "You are Ignite, a sharp, friendly nutrition coach. Answer concisely with practical advice. "
@@ -509,8 +638,8 @@ async def chat_send(body: ChatMessageIn, creds: Optional[HTTPAuthorizationCreden
     )
     if user and user.get("onboarded"):
         sys += (
-            f" Personalize for: goal={user.get('goal')}, calories={user.get('calorieEstimate')}, "
-            f"diet={user.get('dietType')}, allergies={', '.join(user.get('allergies') or []) or 'none'}."
+            f" Personalize for: goal={user.get('goal')}, calories={user.get('calorie_estimate')}, "
+            f"diet={user.get('diet_type')}, allergies={', '.join(user.get('allergies') or []) or 'none'}."
         )
 
     messages = [{"role": "system", "content": sys}] + [
@@ -518,22 +647,25 @@ async def chat_send(body: ChatMessageIn, creds: Optional[HTTPAuthorizationCreden
     ]
     reply = await mercury_chat(messages, max_tokens=700, temperature=0.6)
 
-    await db.chatMessages.insert_one({
-        "id": str(uuid.uuid4()),
+    supabase.table("chat_messages").insert({
         "session_id": body.session_id,
-        "uid": user["uid"] if user else None,
+        "uid": user["id"] if user else None,
         "role": "assistant",
         "content": reply,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    })
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
+
     return {"reply": reply}
 
 @api_router.get("/chat/history/{session_id}")
 async def chat_history(session_id: str):
-    msgs = await db.chatMessages.find(
-        {"session_id": session_id}, {"_id": 0}
-    ).sort("createdAt", 1).to_list(200)
-    return msgs
+    result = supabase.table("chat_messages") \
+        .select("*") \
+        .eq("session_id", session_id) \
+        .order("created_at", desc=True) \
+        .limit(200) \
+        .execute()
+    return result.data if result.data else []
 
 # ============================================================
 # Recipes
@@ -546,47 +678,79 @@ async def create_recipe(body: RecipeIn, user=Depends(current_user)):
         '"tags": [string up to 5], "healthNote": string (one short sentence)}.'
     )
     raw = await mercury_chat(
-        [
-            {"role": "system", "content": sys},
-            {"role": "user", "content": f"Title: {body.title}\nIngredients: {body.ingredients}\nDescription: {body.description}"},
-        ],
+        [{"role": "system", "content": sys}, {"role": "user", "content": f"Title: {body.title}\nIngredients: {body.ingredients}\nDescription: {body.description}"}],
         max_tokens=300,
     )
     meta = extract_json(raw) or {}
     doc = {
-        "id": str(uuid.uuid4()),
-        "uid": user["uid"],
-        "authorName": user.get("name") or "Chef",
+        "uid": user["id"],
+        "author_name": user.get("name") or "Chef",
         "title": body.title,
         "ingredients": body.ingredients,
         "description": body.description,
         "category": meta.get("category", "snack"),
-        "tags": meta.get("tags", [])[:5] if isinstance(meta.get("tags"), list) else [],
-        "healthNote": meta.get("healthNote", "Tasty community recipe."),
+        "tags": json.dumps(meta.get("tags", [])[:5]) if isinstance(meta.get("tags"), list) else json.dumps([]),
+        "health_note": meta.get("healthNote", "Tasty community recipe."),
         "likes": 0,
-        "likedBy": [],
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "liked_by": json.dumps([]),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.recipes.insert_one(dict(doc))
-    doc.pop("_id", None)
-    return doc
+    result = supabase.table("recipes").insert(doc).execute()
+    created = result.data[0] if result.data else doc
+    # Parse JSON fields
+    if isinstance(created.get("tags"), str):
+        created["tags"] = json.loads(created["tags"])
+    if isinstance(created.get("liked_by"), str):
+        created["liked_by"] = json.loads(created["liked_by"])
+    return created
 
 @api_router.get("/recipes")
 async def list_recipes():
-    items = await db.recipes.find({}, {"_id": 0}).sort("createdAt", -1).limit(50).to_list(50)
+    result = supabase.table("recipes") \
+        .select("*") \
+        .order("created_at", desc=True) \
+        .limit(50) \
+        .execute()
+
+    items = result.data if result.data else []
+    for item in items:
+        if isinstance(item.get("tags"), str):
+            item["tags"] = json.loads(item["tags"])
+        if isinstance(item.get("liked_by"), str):
+            item["liked_by"] = json.loads(item["liked_by"])
     return items
 
 @api_router.post("/recipes/{rid}/like")
 async def like_recipe(rid: str, user=Depends(current_user)):
-    r = await db.recipes.find_one({"id": rid}, {"_id": 0})
-    if not r:
+    result = supabase.table("recipes").select("*").eq("id", rid).execute()
+    if not result.data or len(result.data) == 0:
         raise HTTPException(404, "Recipe not found")
-    liked = user["uid"] in (r.get("likedBy") or [])
-    op = {"$pull": {"likedBy": user["uid"]}, "$inc": {"likes": -1}} if liked else \
-         {"$addToSet": {"likedBy": user["uid"]}, "$inc": {"likes": 1}}
-    await db.recipes.update_one({"id": rid}, op)
-    fresh = await db.recipes.find_one({"id": rid}, {"_id": 0})
-    return fresh
+
+    r = result.data[0]
+    liked_by = r.get("liked_by", [])
+    if isinstance(liked_by, str):
+        liked_by = json.loads(liked_by)
+
+    already_liked = user["id"] in liked_by
+    if already_liked:
+        liked_by.remove(user["id"])
+        new_likes = (r.get("likes") or 0) - 1
+    else:
+        liked_by = liked_by + [user["id"]]
+        new_likes = (r.get("likes") or 0) + 1
+
+    supabase.table("recipes").update({
+        "likes": max(new_likes, 0),
+        "liked_by": json.dumps(liked_by),
+    }).eq("id", rid).execute()
+
+    fresh = supabase.table("recipes").select("*").eq("id", rid).execute()
+    updated = fresh.data[0] if fresh.data else r
+    if isinstance(updated.get("tags"), str):
+        updated["tags"] = json.loads(updated["tags"])
+    if isinstance(updated.get("liked_by"), str):
+        updated["liked_by"] = json.loads(updated["liked_by"])
+    return updated
 
 # ============================================================
 # Progress
@@ -594,12 +758,11 @@ async def like_recipe(rid: str, user=Depends(current_user)):
 @api_router.post("/progress")
 async def add_progress(body: ProgressIn, user=Depends(current_user)):
     doc = {
-        "id": str(uuid.uuid4()),
-        "uid": user["uid"],
+        "uid": user["id"],
         "title": body.title,
         "type": body.type,
-        "mealType": body.mealType,
-        "recipeId": body.recipeId,
+        "meal_type": body.mealType,
+        "recipe_id": body.recipeId,
         "calories": body.calories,
         "protein": body.protein,
         "carbs": body.carbs,
@@ -607,20 +770,22 @@ async def add_progress(body: ProgressIn, user=Depends(current_user)):
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "date": datetime.now(timezone.utc).date().isoformat(),
     }
-    await db.progress.insert_one(dict(doc))
-    doc.pop("_id", None)
-    return doc
+    result = supabase.table("progress").insert(doc).execute()
+    return result.data[0] if result.data else doc
 
 @api_router.get("/progress")
 async def list_progress(user=Depends(current_user)):
-    items = await db.progress.find(
-        {"uid": user["uid"]}, {"_id": 0}
-    ).sort("timestamp", -1).limit(50).to_list(50)
-    return items
+    result = supabase.table("progress") \
+        .select("*") \
+        .eq("uid", user["id"]) \
+        .order("timestamp", desc=True) \
+        .limit(50) \
+        .execute()
+    return result.data if result.data else []
 
 @api_router.delete("/progress/{pid}")
 async def delete_progress(pid: str, user=Depends(current_user)):
-    await db.progress.delete_one({"id": pid, "uid": user["uid"]})
+    supabase.table("progress").delete().eq("id", pid).eq("uid", user["id"]).execute()
     return {"ok": True}
 
 # ============================================================
@@ -639,7 +804,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("shutdown")
-async def shutdown():
-    client.close()

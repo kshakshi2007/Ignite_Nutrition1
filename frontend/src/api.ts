@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabase';
 
 const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
 const TOKEN_KEY = 'ignite_token';
@@ -9,10 +10,29 @@ export const tokenStore = {
   async clear() { return AsyncStorage.removeItem(TOKEN_KEY); },
 };
 
+/**
+ * Get a valid access token.
+ * Prefers stored token, falls back to Supabase session.
+ */
+async function getAccessToken(): Promise<string | null> {
+  // Try stored token first
+  const stored = await tokenStore.get();
+  if (stored) return stored;
+
+  // Fall back to Supabase session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    await tokenStore.set(session.access_token);
+    return session.access_token;
+  }
+
+  return null;
+}
+
 async function request<T = any>(path: string, opts: RequestInit = {}, auth = true): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers as any) };
   if (auth) {
-    const t = await tokenStore.get();
+    const t = await getAccessToken();
     if (t) headers.Authorization = `Bearer ${t}`;
   }
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });

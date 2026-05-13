@@ -1,0 +1,16 @@
+# Minimal requirements for Vercel Python Runtime
+# These are the absolute minimum needed to run on Vercel
+# See requirements.txt for full development dependencies
+
+fastapi==0.110.1
+starlette==0.37.2
+pydantic==2.13.4
+pydantic_core==2.46.4
+supabase==2.5.3
+openai==1.99.9
+python-dotenv==1.2.2
+python-multipart==0.0.27
+email-validator==2.3.0
+httpx==0.28.1
+PyJWT==2.12.1
+cryptography==48.0.0

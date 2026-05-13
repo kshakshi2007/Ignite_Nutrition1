@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ignite Nutrition — Download</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Unbounded:wght@600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== Particle Canvas ===== */
+    #particle-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ===== Ambient Glows ===== */
+    .glow {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-purple { top: -200px; left: -150px; width: 500px; height: 500px; background: rgba(176, 38, 255, 0.15); }
+    .glow-red { bottom: -250px; right: -200px; width: 600px; height: 600px; background: rgba(255, 59, 48, 0.18); }
+    .glow-cyan { top: 40%; right: -100px; width: 400px; height: 400px; background: rgba(0, 255, 255, 0.08); }
+
+    /* ===== Content Wrapper ===== */
+    .content {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* ===== Hero ===== */
+    .flame-badge {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: rgba(255, 59, 48, 0.12);
+      border: 1px solid rgba(255, 59, 48, 0.4);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 30px rgba(255, 59, 48, 0.4);
+      margin-bottom: 20px;
+    }
+    .flame-badge svg { width: 36px; height: 36px; }
+    .brand {
+      font-family: 'Unbounded', sans-serif;
+      font-weight: 900;
+      font-size: 56px;
+      letter-spacing: -3px;
+      line-height: 1;
+      color: #fff;
+      margin-bottom: 0;
+    }
+    .brand-sub {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 7px;
+      color: #FF3B30;
+      text-transform: uppercase;
+      margin-top: -2px;
+      margin-bottom: 24px;
+    }
+    .tagline {
+      font-size: 17px;
+      color: #A1A1AA;
+      text-align: center;
+      max-width: 560px;
+      line-height: 1.6;
+      margin-bottom: 48px;
+    }
+
+    /* ===== Feature Grid ===== */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      width: 100%;
+      max-width: 750px;
+      margin-bottom: 56px;
+    }
+    .feature-card {
+      background: rgba(10, 10, 10, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px 20px;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 59, 48, 0.3);
+    }
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 14px;
+    }
+    .feature-icon.flame { background: rgba(255, 59, 48, 0.15); }
+    .feature-icon.cyan { background: rgba(0, 255, 255, 0.1); }
+    .feature-icon.purple { background: rgba(176, 38, 255, 0.12); }
+    .feature-icon.green { background: rgba(0, 255, 65, 0.1); }
+    .feature-card h3 {
+      font-family: 'Unbounded', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: #A1A1AA;
+      line-height: 1.5;
+    }
+
+    /* ===== Download Section ===== */
+    .download-section {
+      width: 100%;
+      max-width: 600px;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .section-title {
+      font-family: 'Unbounded', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .section-sub {
+      color: #71717A;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .download-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+    }
+    .download-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+    }
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 36px;
+      border-radius: 9999px;
+      text-decoration: none;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.25s ease;
+      border: none;
+      cursor: pointer;
+    }
+    .download-btn.primary {
+      background: linear-gradient(135deg, #FF3B30, #FF7A00);
+      color: #000;
+      box-shadow: 0 0 30px rgba(255, 59, 48, 0.5);
+    }
+    .download-btn.primary:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 50px rgba(255, 59, 48, 0.7);
+    }
+    .download-btn.secondary {
+      background: transparent;
+      color: #00FFFF;
+      border: 1px solid rgba(0, 255, 255, 0.4);
+    }
+    .download-btn.secondary:hover {
+      background: rgba(0, 255, 255, 0.08);
+      border-color: #00FFFF;
+      transform: scale(1.04);
+    }
+    .download-btn svg { flex-shrink: 0; }
+    .file-size {
+      font-size: 12px;
+      color: #71717A;
+      margin-top: 4px;
+      font-weight: 400;
+    }
+    .qr-code-area {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .qr-item {
+      text-align: center;
+    }
+    .qr-item canvas, .qr-item img {
+      width: 120px; height: 120px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 6px;
+    }
+    .qr-label {
+      font-size: 11px;
+      color: #71717A;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ===== Footer ===== */
+    .footer {
+      margin-top: auto;
+      padding-top: 40px;
+      text-align: center;
+      width: 100%;
+    }
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .footer-links a {
+      color: #71717A;
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: #FF3B30; }
+    .footer-copy {
+      color: #52525B;
+      font-size: 12px;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 600px) {
+      .content { padding: 40px 16px 60px; }
+      .brand { font-size: 38px; letter-spacing: -2px; }
+      .brand-sub { font-size: 12px; letter-spacing: 5px; }
+      .tagline { font-size: 15px; }
+      .features { grid-template-columns: 1fr 1fr; gap: 12px; }
+      .feature-card { padding: 18px 14px; }
+      .feature-card h3 { font-size: 13px; }
+      .feature-card p { font-size: 12px; }
+      .flame-badge { width: 64px; height: 64px; }
+      .flame-badge svg { width: 28px; height: 28px; }
+      .download-btn { padding: 14px 24px; font-size: 14px; }
+      .qr-code-area { gap: 20px; }
+      .qr-item canvas, .qr-item img { width: 100px; height: 100px; }
+    }
+    @media (max-width: 400px) {
+      .features { grid-template-columns: 1fr; }
+      .download-row { flex-direction: column; }
+      .download-btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Particle Canvas -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- Ambient Glows -->
+  <div class="glow glow-purple"></div>
+  <div class="glow glow-red"></div>
+  <div class="glow glow-cyan"></div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Hero -->
+    <div class="flame-badge">
+      <svg viewBox="0 0 24 24" fill="#FF3B30" stroke="none">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2v-4c0-1.1-.9-2-2-2h-2zm0 6v-4h2v4h-2z"/>
+        <path d="M12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" fill="#FF3B30"/>
+        <path d="M9 9h6v2H9zm0 4h6v2H9z" fill="#FF3B30" transform="rotate(45 12 12)"/>
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-3-8v-4c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2h-2c-1.1 0-2-.9-2-2zm4 0v-4h-2v4h2z" fill="#FF3B30"/>
+        <path d="M11 15h2v2h-2zm0-8h2v2h-2z" fill="#FF3B30"/>
+        <path d="M10 8l2-2 2 2" stroke="#FF3B30" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M14 16l-2 2-2-2" stroke="#FF3B30" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h1 class="brand">IGNITE</h1>
+    <div class="brand-sub">NUTRITION</div>
+    <p class="tagline">Your personal AI fuel coach — meal plans, food scanner, and smart insights, all in one neon dashboard.</p>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon flame">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+          </svg>
+        </div>
+        <h3>AI Meal Plans</h3>
+        <p>Personalized daily plans tailored to your goals, diet, allergies, and local cuisine.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon cyan">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00FFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12h2l2-5 3 10 3-8 3 8 2-5h3"/>
+          </svg>
+        </div>
+        <h3>Food Scanner</h3>
+        <p>Snap a label and get instant Good/Limit/Avoid verdicts with ingredient analysis.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B026FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <line x1="9" y1="10" x2="15" y2="10"/>
+          </svg>
+        </div>
+        <h3>AI Chat Coach</h3>
+        <p>Ask anything about nutrition and get personalized advice from your AI coach.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00FF41" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h2"/>
+            <path d="M18 14h-8"/>
+            <path d="M15 18h-5"/>
+            <path d="M10 6h8v4h-8V6Z"/>
+          </svg>
+        </div>
+        <h3>Community Recipes</h3>
+        <p>Discover AI-tagged recipes from the community. Like, share, and get inspired.</p>
+      </div>
+    </div>
+
+    <!-- Download Section -->
+    <div class="download-section" id="download">
+      <h2 class="section-title">Get Ignite Nutrition</h2>
+      <p class="section-sub">Download the app for your Android device</p>
+
+      <div class="download-grid">
+        <div class="download-row">
+          <a href="public/apk/IgniteNutrition.apk" class="download-btn primary" download>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download APK
+          </a>
+          <a href="public/aab/IgniteNutrition.aab" class="download-btn secondary" download>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download AAB
+          </a>
+        </div>
+
+        <div class="qr-code-area">
+          <div class="qr-item" id="qr-apk">
+            <div style="width:120px;height:120px;border-radius:12px;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;border:1px solid rgba(255,255,255,0.08);">
+              <span style="color:#71717A;font-size:11px;text-align:center;padding:8px;line-height:1.3;">QR for<br>APK</span>
+            </div>
+            <div class="qr-label">APK QR</div>
+          </div>
+          <div class="qr-item" id="qr-aab">
+            <div style="width:120px;height:120px;border-radius:12px;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;border:1px solid rgba(255,255,255,0.08);">
+              <span style="color:#71717A;font-size:11px;text-align:center;padding:8px;line-height:1.3;">QR for<br>AAB</span>
+            </div>
+            <div class="qr-label">AAB QR</div>
+          </div>
+        </div>
+
+        <p style="color:#52525B;font-size:12px;margin-top:4px;">
+          APK: Direct install &bull; AAB: For Google Play Store submission
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-links">
+        <a href="https://github.com/kshakshi2007/Ignite_Nutrition1" target="_blank">GitHub</a>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+      </div>
+      <p class="footer-copy">&copy; 2026 Ignite Nutrition. All rights reserved.</p>
+    </footer>
+
+  </div>
+
+  <!-- Particle Animation -->
+  <script>
+    (function() {
+      const canvas = document.getElementById('particle-canvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      const particles = [];
+      const COLORS = ['#FF3B30', '#00FFFF', '#B026FF'];
+
+      class Particle {
+        constructor() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * H;
+          this.size = 1.5 + Math.random() * 3;
+          this.speedY = 0.3 + Math.random() * 0.7;
+          this.speedX = (Math.random() - 0.5) * 0.3;
+          this.opacity = 0.2 + Math.random() * 0.5;
+          this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+          this.glow = this.color;
+        }
+        update() {
+          this.y -= this.speedY;
+          this.x += this.speedX;
+          if (this.y < -20) {
+            this.y = H + 20;
+            this.x = Math.random() * W;
+          }
+          if (this.x < -20) this.x = W + 20;
+          if (this.x > W + 20) this.x = -20;
+        }
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = this.color;
+          ctx.globalAlpha = this.opacity * 0.6;
+          ctx.fill();
+          // Glow
+          ctx.shadowColor = this.glow;
+          ctx.shadowBlur = 12;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      const pCount = Math.min(40, Math.floor((W * H) / 25000));
+      for (let i = 0; i < pCount; i++) {
+        particles.push(new Particle());
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, W, H);
+        particles.forEach(p => {
+          p.update();
+          p.draw();
+        });
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      // Redraw on resize
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          resize();
+          particles.length = 0;
+          const newCount = Math.min(40, Math.floor((W * H) / 25000));
+          for (let i = 0; i < newCount; i++) particles.push(new Particle());
+        }, 300);
+      });
+    })();
+  </script>
+
+  <!-- QR Code Generation (optional — uses external CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script>
+    // Generate QR codes for download links if QRCode library loaded
+    window.addEventListener('load', function() {
+      const baseUrl = window.location.origin + window.location.pathname.replace(/\/?$/, '');
+      
+      function tryGenerateQR() {
+        if (typeof QRCode !== 'undefined') {
+          // Clear placeholders
+          document.getElementById('qr-apk').innerHTML = '';
+          document.getElementById('qr-aab').innerHTML = '';
+          
+          new QRCode(document.getElementById('qr-apk'), {
+            text: baseUrl + '/public/apk/IgniteNutrition.apk',
+            width: 120,
+            height: 120,
+            colorDark: '#ffffff',
+            colorLight: '#0A0A0A',
+          });
+          new QRCode(document.getElementById('qr-aab'), {
+            text: baseUrl + '/public/aab/IgniteNutrition.aab',
+            width: 120,
+            height: 120,
+            colorDark: '#ffffff',
+            colorLight: '#0A0A0A',
+          });
+          
+          // Add labels back
+          const labels = document.querySelectorAll('#qr-apk, #qr-aab');
+          labels.forEach(el => {
+            const label = document.createElement('div');
+            label.className = 'qr-label';
+            label.textContent = el.id === 'qr-apk' ? 'APK QR' : 'AAB QR';
+            el.appendChild(label);
+          });
+        } else {
+          // Retry after a short delay
+          setTimeout(tryGenerateQR, 500);
+        }
+      }
+      tryGenerateQR();
+    });
+  </script>
+
+</body>
+</html>
