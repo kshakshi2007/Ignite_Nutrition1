@@ -1,0 +1,17 @@
+frontend/
+landing-page/
+node_modules/
+memory/
+test_reports/
+tests/
+.git/
+*.md
+*.pyc
+__pycache__/
+.gitignore
+.gitconfig
+package-lock.json
+design_guidelines.json
+backend_test.py
+test_estimate_macros.py
+test_result.py
