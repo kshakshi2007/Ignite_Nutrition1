@@ -91,7 +91,7 @@ memory/test_credentials.md
 android-sdk/-e 
 
 # Mobile build artifacts — large binaries tracked via Vercel landing page, not git
-*.apk
+
 *.aab
 *.ipa
 frontend/.expo/
