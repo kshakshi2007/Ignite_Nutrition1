@@ -30,8 +30,17 @@ next-env.d.ts
 dist/
 dist
 
-# Environment files (comprehensive coverage)
-
+# Environment and credential files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
 *token.json*
 *credentials.json*
 
@@ -80,11 +89,18 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/-e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
+
+# Mobile build artifacts — large binaries tracked via Vercel landing page, not git
+*.apk
+*.aab
+*.ipa
+frontend/.expo/
+frontend/android/
+frontend/ios/
+frontend/*.jks
+frontend/*.keystore
+
+# Python virtual environments
+*.egg-info/
+*.egg
+MANIFEST
